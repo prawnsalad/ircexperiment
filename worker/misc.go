@@ -7,6 +7,14 @@ import (
 	"github.com/kiwiirc/webircgateway/pkg/irc"
 )
 
+const (
+	DbClientKeyRegistered = "registered"
+	DbClientKeyNick       = "nick"
+	DbClientKeyUsername   = "username"
+	DbClientKeyRealname   = "realname"
+	DbClientKeyHostname   = "hostname"
+)
+
 type ModeList struct {
 	sync.Mutex
 	Modes map[string]string

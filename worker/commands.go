@@ -42,7 +42,7 @@ func runCommand(worker *WorkerProces, clientID int, msg *irc.Message) {
 
 	if !client.Registered && !cmd.RequiresRegistered && client.CanRegister() {
 		registerClient(client)
-		worker.Data.ClientSet(clientID, "registered", boolAsInt(true))
+		worker.Data.ClientSet(clientID, DbClientKeyRegistered, boolAsInt(true))
 		worker.Data.ClientModeSet(clientID, "i", boolAsByte(true))
 	}
 }
@@ -69,8 +69,8 @@ func loadCommands(worker *WorkerProces) (commands map[string]Command) {
 		Fn: func(c *RClient, m *irc.Message) {
 			username := messageParam(m, 0)
 			realname := messageParam(m, 3)
-			worker.Data.ClientSet(c.Id, "username", []byte(username))
-			worker.Data.ClientSet(c.Id, "realname", []byte(realname))
+			worker.Data.ClientSet(c.Id, DbClientKeyUsername, []byte(username))
+			worker.Data.ClientSet(c.Id, DbClientKeyRealname, []byte(realname))
 			c.Username = username
 			c.RealName = realname
 		},
@@ -81,7 +81,7 @@ func loadCommands(worker *WorkerProces) (commands map[string]Command) {
 		Fn: func(c *RClient, m *irc.Message) {
 			nick := m.Params[0]
 			// TODO: Make sure nick is not already in use
-			worker.Data.ClientSet(c.Id, "nick", []byte(nick))
+			worker.Data.ClientSet(c.Id, DbClientKeyNick, []byte(nick))
 			c.Nick = nick
 			if c.Registered {
 				c.WriteWithPrefix("NICK %s", c.Nick)

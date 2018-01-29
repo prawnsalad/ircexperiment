@@ -48,7 +48,7 @@ func (worker *WorkerProces) HandleRpcEvent(rpcEvent common.RpcEvent) {
 		log.Printf("client state changed %d (%d %s)", event.State, event.ClientID, event.Raddress)
 		if event.State == 1 {
 			host, _, _ := net.SplitHostPort(event.Raddress)
-			worker.Data.ClientSet(event.ClientID, "hostname", []byte(host))
+			worker.Data.ClientSet(event.ClientID, DbClientKeyHostname, []byte(host))
 		}
 	}
 
