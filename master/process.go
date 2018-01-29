@@ -49,6 +49,7 @@ func (master *MasterProcess) handleConn(conn net.Conn, clientID int) {
 	master.EventQueue.addEvent(common.RpcEventClientStateName, common.RpcEventClientState{
 		ClientID: clientID,
 		State:    1,
+		Raddress: conn.RemoteAddr().String(),
 	})
 
 	go func() {

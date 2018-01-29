@@ -22,6 +22,7 @@ type RpcEventClientState struct {
 	ClientID int
 	State    int
 	Reason   string
+	Raddress string
 }
 
 var RpcEventClientDataName = "client.data"

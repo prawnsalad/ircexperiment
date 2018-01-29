@@ -71,7 +71,6 @@ func loadCommands(worker *WorkerProces) (commands map[string]Command) {
 			realname := messageParam(m, 3)
 			worker.Data.ClientSet(c.Id, "username", []byte(username))
 			worker.Data.ClientSet(c.Id, "realname", []byte(realname))
-			worker.Data.ClientSet(c.Id, "hostname", []byte("host.isp"))
 			c.Username = username
 			c.RealName = realname
 		},

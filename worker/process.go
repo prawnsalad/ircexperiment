@@ -2,6 +2,8 @@ package worker
 
 import (
 	"fmt"
+	"log"
+	"net"
 	"net/rpc"
 
 	"../common"
@@ -43,7 +45,11 @@ func (worker *WorkerProces) HandleRpcEvent(rpcEvent common.RpcEvent) {
 	if rpcEvent.Name == common.RpcEventClientStateName {
 		event := rpcEvent.Event.(common.RpcEventClientState)
 		// event.State 0=closed 1=connected
-		println("[worker client state changed]", event.ClientID, event.State)
+		log.Printf("client state changed %d (%d %s)", event.State, event.ClientID, event.Raddress)
+		if event.State == 1 {
+			host, _, _ := net.SplitHostPort(event.Raddress)
+			worker.Data.ClientSet(event.ClientID, "hostname", []byte(host))
+		}
 	}
 
 	if rpcEvent.Name == common.RpcEventClientDataName {
