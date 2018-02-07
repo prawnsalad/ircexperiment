@@ -13,22 +13,26 @@ import (
 	"github.com/kardianos/osext"
 )
 
-func RunRpcServer(proc *MasterProcess, masterSock string) {
+func RunRpcServer(proc *MasterProcess, workerPath, masterSock string) {
 	rpc.RegisterName("queue", proc.EventQueue)
 	rpc.RegisterName("conns", &RpcConnInterface{MasterProc: proc})
 	rpc.RegisterName("data", NewRpcDataInterface())
-
-	ex, _ := osext.Executable()
-	println("Using worker binary", ex)
 
 	if masterSock == "" {
 		masterSock = "unix:/tmp/go.sock"
 		masterSock = "std"
 	}
 
+	if workerPath == "" {
+		workerPath, _ = osext.Executable()
+	}
+	exArgs := []string{"--worker=" + masterSock}
+
+	println("Using worker binary", workerPath)
+
 	for {
 		if masterSock == "std" {
-			app := exec.Command(ex, "--worker="+masterSock)
+			app := exec.Command(workerPath, exArgs...)
 			app.Stderr = os.Stdout
 
 			stdIn, _ := app.StdinPipe()
@@ -40,7 +44,11 @@ func RunRpcServer(proc *MasterProcess, masterSock string) {
 			}
 
 			println("Serving worker process")
-			app.Start()
+			err := app.Start()
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+
 			rpc.ServeConn(appPipe)
 
 		} else if strings.HasPrefix(masterSock, "unix:") {
@@ -52,7 +60,7 @@ func RunRpcServer(proc *MasterProcess, masterSock string) {
 
 			go rpc.Accept(ln)
 
-			app := exec.Command(ex, "--worker="+masterSock)
+			app := exec.Command(workerPath, exArgs...)
 			app.Stderr = os.Stderr
 
 			app.Start()
