@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"../common"
 	"github.com/kiwiirc/webircgateway/pkg/irc"
 )
 
@@ -60,7 +61,7 @@ func loadCommands(worker *WorkerProces) (commands map[string]Command) {
 	commands["PING"] = Command{
 		RequiresRegistered: false,
 		Fn: func(c *RClient, m *irc.Message) {
-			c.WriteWithPrefix("PONG %s", messageParam(m, 1))
+			c.WriteWithPrefix("PONG %s", messageParam(m, 0))
 		},
 	}
 
@@ -81,10 +82,11 @@ func loadCommands(worker *WorkerProces) (commands map[string]Command) {
 		Fn: func(c *RClient, m *irc.Message) {
 			nick := m.Params[0]
 			// TODO: Make sure nick is not already in use
+			oldNick := c.Nick
 			worker.Data.ClientSet(c.Id, DbClientKeyNick, []byte(nick))
 			c.Nick = nick
 			if c.Registered {
-				c.WriteWithPrefix("NICK %s", c.Nick)
+				c.Write(":%s!%s@%s NICK %s", oldNick, c.Username, c.Hostname, c.Nick)
 			}
 		},
 	}
@@ -239,6 +241,21 @@ func loadCommands(worker *WorkerProces) (commands map[string]Command) {
 			},
 		}
 	*/
+
+	commands["WGET"] = Command{
+		RequiresRegistered: false,
+		Fn: func(c *RClient, m *irc.Message) {
+			var err error
+			worker.RpcCall("conns.Open", common.RpcEventConnState{
+				RAddress: "irc.freenode.net:6667",
+				Tls:      false,
+			}, &err)
+
+			if err != nil {
+				println(err.Error())
+			}
+		},
+	}
 	return
 }
 

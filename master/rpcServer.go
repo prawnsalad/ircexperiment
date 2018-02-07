@@ -15,7 +15,7 @@ import (
 
 func RunRpcServer(proc *MasterProcess, masterSock string) {
 	rpc.RegisterName("queue", proc.EventQueue)
-	rpc.RegisterName("clients", &RpcClientInterface{MasterProc: proc})
+	rpc.RegisterName("conns", &RpcConnInterface{MasterProc: proc})
 	rpc.RegisterName("data", NewRpcDataInterface())
 
 	ex, _ := osext.Executable()

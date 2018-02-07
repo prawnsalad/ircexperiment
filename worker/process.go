@@ -42,25 +42,25 @@ func (worker *WorkerProces) RpcCall(serviceMethod string, args interface{}, repl
 
 func (worker *WorkerProces) HandleRpcEvent(rpcEvent common.RpcEvent) {
 	println("[worker] HandleRpcEvent()", rpcEvent.Name)
-	if rpcEvent.Name == common.RpcEventClientStateName {
-		event := rpcEvent.Event.(common.RpcEventClientState)
+	if rpcEvent.Name == common.RpcEventConnStateName {
+		event := rpcEvent.Event.(common.RpcEventConnState)
 		// event.State 0=closed 1=connected
-		log.Printf("client state changed %d (%d %s)", event.State, event.ClientID, event.Raddress)
-		if event.State == 1 {
-			host, _, _ := net.SplitHostPort(event.Raddress)
-			worker.Data.ClientSet(event.ClientID, DbClientKeyHostname, []byte(host))
+		log.Printf("client state changed %d (%d %s)", event.State, event.ConnID, event.RAddress)
+		if event.State == common.RpcEventConnStateOpen {
+			host, _, _ := net.SplitHostPort(event.RAddress)
+			worker.Data.ClientSet(event.ConnID, DbClientKeyHostname, []byte(host))
 		}
 	}
 
-	if rpcEvent.Name == common.RpcEventClientDataName {
-		event := rpcEvent.Event.(common.RpcEventClientData)
-		// log.Printf("[worker] client:%d %s", event.ClientID, string(event.Data))
+	if rpcEvent.Name == common.RpcEventConnDataName {
+		event := rpcEvent.Event.(common.RpcEventConnData)
+		log.Printf("[worker] data in client:%d %s", event.ConnID, string(event.Data))
 		msg, _ := irc.ParseLine(string(event.Data))
 		if msg == nil {
 			return
 		}
 
-		runCommand(worker, event.ClientID, msg)
+		runCommand(worker, event.ConnID, msg)
 	}
 }
 
@@ -69,17 +69,17 @@ func (worker *WorkerProces) WriteClient(clientID int, format string, args ...int
 	line := fmt.Sprintf(format, args...)
 	println("WriteClient()", line)
 
-	dataCall := common.RpcEventClientData{
-		ClientID: clientID,
-		Data:     []byte(line),
+	dataCall := common.RpcEventConnData{
+		ConnID: clientID,
+		Data:   []byte(line),
 	}
 
-	worker.RpcCall("clients.Write", dataCall, nil)
+	worker.RpcCall("conns.Write", dataCall, nil)
 }
 func (worker *WorkerProces) CloseClient(clientID int) {
-	dataCall := common.RpcEventClientState{
-		ClientID: clientID,
+	dataCall := common.RpcEventConnState{
+		ConnID: clientID,
 	}
 
-	worker.rpcClient.Call("client.Close", dataCall, nil)
+	worker.rpcClient.Call("conns.Close", dataCall, nil)
 }
