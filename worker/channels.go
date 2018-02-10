@@ -1,5 +1,6 @@
 package worker
 
+/*
 import (
 	"fmt"
 	"strings"
@@ -119,3 +120,4 @@ type ChannelEvent struct {
 	Message string
 	Source  *Client
 }
+*/

@@ -136,3 +136,11 @@ func byteSliceAsStrings(inp [][]byte) []string {
 	}
 	return s
 }
+
+func byteMapAsStrings(inp map[string][]byte) map[string]string {
+	s := make(map[string]string)
+	for k, v := range inp {
+		s[k] = string(v)
+	}
+	return s
+}

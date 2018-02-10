@@ -11,14 +11,16 @@ import (
 )
 
 type WorkerProces struct {
-	Commands  map[string]Command
-	rpcClient *rpc.Client
-	Data      *DataRpcWrapper
+	ClientCommands map[string]Command
+	ServerCommands map[string]ServerCommand
+	rpcClient      *rpc.Client
+	Data           *DataRpcWrapper
 }
 
 func NewWorkerProcess() *WorkerProces {
 	proc := &WorkerProces{}
-	proc.Commands = make(map[string]Command)
+	proc.ClientCommands = make(map[string]Command)
+	proc.ServerCommands = make(map[string]ServerCommand)
 
 	return proc
 }
@@ -29,7 +31,7 @@ func (worker *WorkerProces) SetRpcClient(client *rpc.Client) {
 }
 
 func (worker *WorkerProces) LoadCommands() {
-	worker.Commands = loadCommands(worker)
+	worker.ClientCommands = loadClientCommands(worker)
 }
 
 func (worker *WorkerProces) RpcCall(serviceMethod string, args interface{}, reply interface{}) error {
@@ -60,7 +62,11 @@ func (worker *WorkerProces) HandleRpcEvent(rpcEvent common.RpcEvent) {
 			return
 		}
 
-		runCommand(worker, event.ConnID, msg)
+		if event.ConnType == common.RpcEventConnTypeIn {
+			runClientCommand(worker, event.ConnID, msg)
+		} else if event.ConnType == common.RpcEventConnTypeIn {
+			//runInCommand(worker, event.ConnID, msg)
+		}
 	}
 }
 

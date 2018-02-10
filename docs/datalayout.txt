@@ -1,0 +1,32 @@
+# ledis for current live state
+# database for persistent storage such as user access
+
+client:{con_id} (hash)
+    remote_addr = string
+    user_id = int
+    active_net_id = int
+    nick = string
+
+client:{con_id}:caps (hash)
+    {cap_name}: string
+
+client:{user_id}:{net_id} (hash)
+    conn_id = int
+    connected = bool
+    registered = bool
+    nick = string
+    net_name = string
+
+client:{user_id}:{net_id}:modes (hash)
+    {mode} = string
+
+client:{user_id}:{net_id}:buffers:{buffername} (hash)
+    joined = bool
+    attached = bool
+
+outgoing:{con_id}
+    user_id = int
+    net_id = int
+
+outgoing:{con_id}:clients set
+    [{con_id}, {con_id}]

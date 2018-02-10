@@ -1,11 +1,5 @@
 package worker
 
-import (
-	"fmt"
-	"log"
-	"net"
-)
-
 type RChannel struct {
 	Worker        *WorkerProces
 	Loaded        bool
@@ -54,121 +48,51 @@ func (c *RChannel) IsClientOn(clientID int) bool {
 	return isInChannel
 }
 
-type RClient struct {
-	Worker     *WorkerProces
-	Loaded     bool
-	Id         int
-	Registered bool
-	Nick       string
-	Username   string
-	Hostname   string
-	RealName   string
-	Modes      *ModeList
-}
-
-func NewRClient(worker *WorkerProces) *RClient {
-	return &RClient{Worker: worker}
-}
-
-func (c *RClient) Load(clientID int) {
-	//println("Loading client", clientID)
-	c.Id = clientID
-	c.Registered = byteAsBool(c.Worker.Data.ClientGet(clientID, "registered"))
-	c.Username = string(c.Worker.Data.ClientGet(clientID, "username"))
-	c.Nick = string(c.Worker.Data.ClientGet(clientID, "nick"))
-	c.RealName = string(c.Worker.Data.ClientGet(clientID, "realname"))
-	c.Hostname = string(c.Worker.Data.ClientGet(clientID, "hostname"))
-
-	modeMap := c.Worker.Data.ClientModes(clientID)
-	c.Modes = NewModeListFromMap(modeMap)
-
-	c.Loaded = true
-}
-
-func (c *RClient) Write(format string, args ...interface{}) {
-	c.Worker.WriteClient(c.Id, format, args...)
-}
-
-func (c *RClient) WriteWithPrefix(format string, args ...interface{}) {
-	prefix := fmt.Sprintf(":%s!%s@%s", c.Nick, c.Username, c.Hostname)
-	println(c.Loaded, prefix)
-	format = prefix + " " + format
-	c.Worker.WriteClient(c.Id, format, args...)
-}
-
-func (c *RClient) WriteWithServerPrefix(format string, args ...interface{}) {
-	prefix := string(c.Worker.Data.HashGet("server", "mask"))
-	format = ":" + prefix + " " + format
-	c.Worker.WriteClient(c.Id, format, args...)
-}
-
-func (c *RClient) CanRegister() bool {
-	log.Printf("c.Username = '%s' c.Nick = '%s' c.RealName = '%s'", c.Username, c.Nick, c.RealName)
-	if c.Username != "" && c.Nick != "" && c.RealName != "" {
-		return true
-	}
-
-	return false
-}
-
+// Add extra client functions around the client data wrapper
 type Client struct {
-	Id         int
-	Conn       net.Conn
-	Registered bool
-	User       struct {
-		Nick     string
-		Username string
-		Hostname string
-		RealName string
-		Meta     map[string]string
-		Modes    *ModeList
-	}
-	Channels *ChannelList
+	*DataWrapperClient
+	Worker *WorkerProces
 }
 
-var nextClientId int
-
-func NewClient(conn net.Conn) *Client {
-	nextClientId++
-	c := &Client{
-		Id:       nextClientId,
-		Conn:     conn,
-		Channels: NewChannelList(),
+func NewClient(worker *WorkerProces, clientID int) *Client {
+	c := NewDataWrapperClient(worker.Data, clientID)
+	return &Client{
+		Worker:            worker,
+		DataWrapperClient: c,
 	}
+}
 
-	c.User.Meta = make(map[string]string)
-	c.User.Modes = NewModeList()
-	c.User.Hostname = conn.RemoteAddr().String()
-
-	return c
+func NewClientFromDataWrapper(worker *WorkerProces, c *DataWrapperClient) *Client {
+	return &Client{
+		Worker:            worker,
+		DataWrapperClient: c,
+	}
 }
 
 func (c *Client) Write(format string, args ...interface{}) {
-	format = format + "\n"
-	line := fmt.Sprintf(format, args...)
-	c.Conn.Write([]byte(line))
+	c.Worker.WriteClient(c.ClientID, format, args...)
 }
 
-func (c *Client) WriteWithPrefix(format string, args ...interface{}) {
-	prefix := fmt.Sprintf(":%s!%s@%s", c.User.Nick, c.User.Username, c.User.Hostname)
-	format = prefix + " " + format + "\n"
-	line := fmt.Sprintf(format, args...)
-	c.Conn.Write([]byte(line))
+func (c *Client) WriteStatus(format string, args ...interface{}) {
+	format = ":*status!this-is@your.bnc NOTICE " + format
+	c.Worker.WriteClient(c.ClientID, format, args...)
 }
+
 func (c *Client) WriteWithServerPrefix(format string, args ...interface{}) {
-	prefix := fmt.Sprintf(":%s!%s@%s", c.User.Nick, c.User.Username, c.User.Hostname)
-	format = prefix + " " + format + "\n"
-	line := fmt.Sprintf(format, args...)
-	c.Conn.Write([]byte(line))
+	format = ":*status!this-is@your.bnc " + format
+	c.Worker.WriteClient(c.ClientID, format, args...)
 }
 
-func canClientRegister(c *Client) bool {
-	return c.User.Username != "" && c.User.Nick != "" && c.User.RealName != ""
+func (d *Client) HasAuthed() bool {
+	if d.UserID() == 0 {
+		return false
+	} else {
+		return true
+	}
 }
 
-func registerClient(c *RClient) {
+func registerClient(c *Client) {
 	println("registerClient()")
-	c.Registered = true
 	// TODO: Add client to global client mapping or something
 
 	c.WriteWithServerPrefix("001 %s :Welcome to the network", c.Nick)
@@ -191,47 +115,4 @@ func registerClient(c *RClient) {
 	c.WriteWithServerPrefix("005 %s %s :are supported by this server", c.Nick, isup.AsString())
 
 	c.WriteWithServerPrefix("422 :There is no MOTD on this server")
-}
-
-func addClientToChannel(client *Client, channel *Channel) bool {
-	println("addClientToChannel()", client.User.Nick, channel.Name)
-	channel.ClientsLock.Lock()
-	defer channel.ClientsLock.Unlock()
-
-	// Make sure this client doesn't exist in the channel already
-	for _, compareClient := range channel.Clients {
-		if client == compareClient {
-			println("Client already in channel")
-			return false
-		}
-	}
-
-	channel.Clients = append(channel.Clients, client)
-	client.Channels.Add(channel)
-	return true
-}
-
-func delClientFromChannel(client *Client, channel *Channel) bool {
-	channel.ClientsLock.Lock()
-	defer channel.ClientsLock.Unlock()
-
-	clientIdx := -1
-	for idx, compareClient := range channel.Clients {
-		if client == compareClient {
-			clientIdx = idx
-			break
-		}
-	}
-
-	if clientIdx == -1 {
-		return false
-	}
-
-	// Swap the client with the last one in the array, then remove the last item. Fast.
-	i := clientIdx
-	channel.Clients[len(channel.Clients)-1], channel.Clients[i] = channel.Clients[i], channel.Clients[len(channel.Clients)-1]
-	channel.Clients = channel.Clients[:len(channel.Clients)-1]
-
-	client.Channels.Del(channel.Name)
-	return true
 }
