@@ -2,7 +2,9 @@ package worker
 
 import (
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"../common"
@@ -38,14 +40,6 @@ func runClientCommand(worker *WorkerProces, clientID int, msg *irc.Message) {
 	}
 
 	cmd.Fn(c, msg)
-	/*
-		TODO: if not authed, now we have all the info to auth, then auth
-		if !client.Registered && !cmd.RequiresRegistered && client.CanRegister() {
-			registerClient(client)
-			worker.Data.ClientSet(clientID, DbClientKeyRegistered, boolAsInt(true))
-			worker.Data.ClientModeSet(clientID, "i", boolAsByte(true))
-		}
-	*/
 }
 
 func loadClientCommands(worker *WorkerProces) (commands map[string]Command) {
@@ -68,8 +62,8 @@ func loadClientCommands(worker *WorkerProces) (commands map[string]Command) {
 	commands["USER"] = Command{
 		RequiresRegistered: false,
 		Fn: func(c *Client, m *irc.Message) {
-			//username := messageParam(m, 0)
-			//realname := messageParam(m, 3)
+			// username := messageParam(m, 0)
+			// realname := messageParam(m, 3)
 		},
 	}
 
@@ -81,23 +75,139 @@ func loadClientCommands(worker *WorkerProces) (commands map[string]Command) {
 		},
 	}
 
+	commands["REG"] = Command{
+		RequiresRegistered: false,
+		Fn: func(c *Client, m *irc.Message) {
+			// REG username password
+			username := strings.ToLower(messageParam(m, 0))
+			password := messageParam(m, 1)
+
+			err := RegisterAccount(c.data, username, password)
+			if err != nil {
+				c.WriteStatus(err.Error())
+			} else {
+				c.WriteStatus("Account registered")
+			}
+
+		},
+	}
+
 	commands["PASS"] = Command{
 		RequiresRegistered: false,
 		Fn: func(c *Client, m *irc.Message) {
 			pass := messageParam(m, 0)
 			var username, network, password string
-			fmt.Sscanf(pass, "%s/%s:%s", &username, &network, &password)
 
-			// TODO: Auth here with persistent storage layer
-			// TODO: Get the network ID from the network name here
-			netID := 1
-			c.SetActiveNetID(netID)
+			// Split the user/network:password format before passing them to Auth
+			parts := strings.SplitN(pass, ":", 2)
+			if len(parts) == 2 {
+				password = parts[1]
+			}
 
-			net := c.NetworkData()
-			c.Write(":%s NICK %s", c.Nick(), net.Nick())
-			c.SetNick(net.Nick())
+			parts = strings.SplitN(parts[0], "/", 2)
+			username = parts[0]
+			if len(parts) == 2 {
+				network = parts[1]
+			}
 
-			// TODO: Dump network reg info here
+			if !c.Auth(username, password) {
+				println("PASS fail")
+				c.WriteStatus("Invalid password")
+				return
+			}
+
+			println("PASS OK", network)
+
+			if network != "" {
+				netInfo, netExists := c.GetNetworkInfo(network)
+				if !netExists {
+					c.WriteStatus("Network not found")
+					return
+				}
+
+				println("Setting active net ID to " + strconv.Itoa(netInfo.ID))
+				c.SetActiveNetID(netInfo.ID)
+
+				net := c.NetworkData()
+				c.Write(":%s NICK %s", c.Nick(), net.Nick())
+				c.SetNick(net.Nick())
+
+				// TODO: Dump network reg info here
+			} else {
+				c.WriteStatus("Woo, logged in!")
+			}
+		},
+	}
+
+	commands["PRIVMSG"] = Command{
+		RequiresRegistered: true,
+		Fn: func(c *Client, m *irc.Message) {
+			target := messageParam(m, 0)
+			if target != "*status" {
+				return
+			}
+
+			if !c.HasAuthed() {
+				c.WriteStatus("Must login first")
+				return
+			}
+
+			message := messageParam(m, 1)
+			parts := strings.Split(message, " ")
+			arg := func(idx int) string {
+				// This command args starts at idx 2
+				return strSliceIdx(parts, idx)
+			}
+			if arg(0) == "network" && arg(1) == "add" {
+				// network add freenode irc.freenode.net:+6667
+				netName := arg(2)
+				server := arg(3)
+
+				hostStr, portStr, err := net.SplitHostPort(server)
+				if err != nil || hostStr == "" {
+					c.WriteStatus("Invalid server")
+					return
+				}
+
+				host := hostStr
+				port := 6667
+				tls := false
+
+				if portStr[0] == '+' {
+					tls = true
+					portStr = portStr[1:]
+				}
+
+				givenPort, _ := strconv.Atoi(portStr)
+				if givenPort > 0 {
+					port = givenPort
+				}
+
+				_, netExists := c.GetNetworkInfo(netName)
+				if netExists {
+					c.WriteStatus("That network already exists")
+					return
+				}
+
+				newNet := NetworkInfo{}
+				newNet.Name = netName
+				newNet.Host = host
+				newNet.Port = port
+				newNet.TLS = tls
+				newNet.AutoConnect = false
+
+				savedNetwork := c.SaveNetworkInfo(newNet)
+
+				c.WriteStatus(fmt.Sprintf("Network saved! (%d/%s)", savedNetwork.ID, savedNetwork.Name))
+				return
+			}
+
+			if arg(0) == "network" && arg(1) == "" {
+				nets := c.ListNetworks()
+				for _, net := range nets {
+					c.WriteStatus(fmt.Sprintf("%s %d", net.Name, net.ID))
+				}
+			}
 		},
 	}
 

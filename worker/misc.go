@@ -58,12 +58,29 @@ func (m *ModeList) Del(mode string) {
 	m.Unlock()
 }
 
+type NetworkInfo struct {
+	ID          int
+	Name        string
+	Host        string
+	Port        int
+	TLS         bool
+	AutoConnect bool
+}
+
 func messageParam(msg *irc.Message, idx int) string {
 	if idx > len(msg.Params)-1 {
 		return ""
 	}
 
 	return msg.Params[idx]
+}
+
+func strSliceIdx(sl []string, idx int) string {
+	if idx > len(sl)-1 {
+		return ""
+	}
+
+	return sl[idx]
 }
 
 func contains(slice []string, item string) bool {

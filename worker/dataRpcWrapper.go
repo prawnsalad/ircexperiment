@@ -15,6 +15,19 @@ func debugLog(args ...interface{}) {
 	//log.Println(args...)
 }
 
+// Hacky for now, but keys starting with "user:" and the key "users"
+// will always be stored in the persistent store. Everything else is
+// considered temporary state for the current process
+func storeTypeFromKeyName(key string) int {
+	if strings.HasPrefix(key, "user:") || key == "users" {
+		return common.DataStorePersistent
+	}
+
+	return common.DataStoreTemporary
+}
+
+// DataRpcWrapper wraps the native GO rpc.Client with our data helper functions
+// This will usually be extended again by domain specific use cases such as client/user/etc
 type DataRpcWrapper struct {
 	rpcClient *rpc.Client
 }
@@ -22,9 +35,10 @@ type DataRpcWrapper struct {
 // Hash functions
 func (data *DataRpcWrapper) HashGet(key string, field string) []byte {
 	debugLog("HashGet()", key, field)
-	dataCall := common.RpcDataHash{
+	dataCall := common.RpcData{
 		Key:   strings.ToLower(key),
 		Field: strings.ToLower(field),
+		Store: storeTypeFromKeyName(key),
 	}
 	var val []byte
 	err := data.rpcClient.Call("data.HGet", dataCall, &val)
@@ -38,8 +52,9 @@ func (data *DataRpcWrapper) HashGet(key string, field string) []byte {
 // Hash functions
 func (data *DataRpcWrapper) HashGetAll(key string) map[string][]byte {
 	debugLog("HashGetAll()", key)
-	dataCall := common.RpcDataHash{
-		Key: strings.ToLower(key),
+	dataCall := common.RpcData{
+		Key:   strings.ToLower(key),
+		Store: storeTypeFromKeyName(key),
 	}
 	var val map[string][]byte
 	err := data.rpcClient.Call("data.HGetAll", dataCall, &val)
@@ -53,10 +68,11 @@ func (data *DataRpcWrapper) HashGetAll(key string) map[string][]byte {
 // Hash functions
 func (data *DataRpcWrapper) HashSet(key string, field string, val []byte) {
 	debugLog("HashSet()", key, field)
-	dataCall := common.RpcDataHash{
+	dataCall := common.RpcData{
 		Key:   strings.ToLower(key),
 		Field: strings.ToLower(field),
 		Val:   val,
+		Store: storeTypeFromKeyName(key),
 	}
 
 	err := data.rpcClient.Call("data.HSet", dataCall, nil)
@@ -68,8 +84,9 @@ func (data *DataRpcWrapper) HashSet(key string, field string, val []byte) {
 // Basic k/v
 func (data *DataRpcWrapper) Get(key string) []byte {
 	debugLog("Get()", key)
-	dataCall := common.RpcDataHash{
-		Key: strings.ToLower(key),
+	dataCall := common.RpcData{
+		Key:   strings.ToLower(key),
+		Store: storeTypeFromKeyName(key),
 	}
 	var val []byte
 	err := data.rpcClient.Call("data.Get", dataCall, &val)
@@ -83,9 +100,10 @@ func (data *DataRpcWrapper) Get(key string) []byte {
 // Basic k/v
 func (data *DataRpcWrapper) Set(key string, val []byte) {
 	debugLog("Set()", key)
-	dataCall := common.RpcDataHash{
-		Key: strings.ToLower(key),
-		Val: val,
+	dataCall := common.RpcData{
+		Key:   strings.ToLower(key),
+		Val:   val,
+		Store: storeTypeFromKeyName(key),
 	}
 
 	err := data.rpcClient.Call("data.Set", dataCall, nil)
@@ -97,8 +115,9 @@ func (data *DataRpcWrapper) Set(key string, val []byte) {
 // Set of data (unordered lists)
 func (data *DataRpcWrapper) SetGet(key string) [][]byte {
 	debugLog("SetGet()", key)
-	dataCall := common.RpcDataHash{
-		Key: strings.ToLower(key),
+	dataCall := common.RpcData{
+		Key:   strings.ToLower(key),
+		Store: storeTypeFromKeyName(key),
 	}
 
 	var items [][]byte
@@ -113,9 +132,10 @@ func (data *DataRpcWrapper) SetGet(key string) [][]byte {
 // Set of data (unordered lists)
 func (data *DataRpcWrapper) SetAdd(key string, val []byte) {
 	debugLog("SetAdd()", key)
-	dataCall := common.RpcDataHash{
-		Key: strings.ToLower(key),
-		Val: val,
+	dataCall := common.RpcData{
+		Key:   strings.ToLower(key),
+		Val:   val,
+		Store: storeTypeFromKeyName(key),
 	}
 
 	err := data.rpcClient.Call("data.SAdd", dataCall, nil)
@@ -127,9 +147,10 @@ func (data *DataRpcWrapper) SetAdd(key string, val []byte) {
 // Set of data (unordered lists)
 func (data *DataRpcWrapper) SetDel(key string, val []byte) {
 	debugLog("SetDel()", key)
-	dataCall := common.RpcDataHash{
-		Key: strings.ToLower(key),
-		Val: val,
+	dataCall := common.RpcData{
+		Key:   strings.ToLower(key),
+		Val:   val,
+		Store: storeTypeFromKeyName(key),
 	}
 
 	err := data.rpcClient.Call("data.SDel", dataCall, nil)
@@ -239,7 +260,7 @@ type DataWrapper struct {
 // Hash functions
 func (data *DataWrapper) HashGet(key string, field string) []byte {
 	debugLog("HashGet()", key, field)
-	dataCall := common.RpcDataHash{
+	dataCall := common.RpcData{
 		Key:   strings.ToLower(key),
 		Field: strings.ToLower(field),
 	}
@@ -255,7 +276,7 @@ func (data *DataWrapper) HashGet(key string, field string) []byte {
 // Hash functions
 func (data *DataWrapper) HashGetAll(key string) map[string][]byte {
 	debugLog("HashGetAll()", key)
-	dataCall := common.RpcDataHash{
+	dataCall := common.RpcData{
 		Key: strings.ToLower(key),
 	}
 	var val map[string][]byte
@@ -270,7 +291,7 @@ func (data *DataWrapper) HashGetAll(key string) map[string][]byte {
 // Hash functions
 func (data *DataWrapper) HashSet(key string, field string, val []byte) {
 	debugLog("HashSet()", key, field)
-	dataCall := common.RpcDataHash{
+	dataCall := common.RpcData{
 		Key:   strings.ToLower(key),
 		Field: strings.ToLower(field),
 		Val:   val,

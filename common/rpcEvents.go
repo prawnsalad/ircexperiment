@@ -7,6 +7,7 @@ func RegisterRpcGobTypes() {
 	gob.Register(RpcEvent{})
 	gob.Register(RpcEventConnState{})
 	gob.Register(RpcEventConnData{})
+	gob.Register(RpcData{})
 }
 
 // Events added to the event queue. Workers pick these up to act upon
@@ -43,12 +44,11 @@ type RpcEventConnData struct {
 	Data     []byte
 }
 
-type RpcDataKeyVal struct {
-	Key string
-	Val []byte
-}
+const DataStoreTemporary = 0
+const DataStorePersistent = 1
 
-type RpcDataHash struct {
+type RpcData struct {
+	Store int
 	Key   string
 	Field string
 	Val   []byte

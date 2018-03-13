@@ -1,5 +1,26 @@
+# persistent data storage
+users (hash)
+    {username} = int
+
+user:{user_id} (hash)
+    id = int
+    created = int
+    username = string
+    password = string
+
+user:{user_id}:networks (hash)
+    {net_name} = int {net_id}
+
+user:{user_id}:network:{net_id} (hash)
+    id = int
+    host = string
+    port = int
+    tls = bool
+    auto_connect = bool
+
+
+
 # ledis for current live state
-# database for persistent storage such as user access
 
 client:{con_id} (hash)
     remote_addr = string
